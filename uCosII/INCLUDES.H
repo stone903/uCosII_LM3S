@@ -16,6 +16,10 @@
 #include    <stdlib.h>
 #include    <setjmp.h>
 
+/* Driver Files */
+#include "LM3S\driverlib\interrupt.h"
+
+/* OS related files */
 #include    "uCosII\Porting\os_cpu.h"
 #include    "os_cfg.h"
 #include    "uCosII\Common\ucos_ii.h"

@@ -20,6 +20,8 @@
 ;                                    PUBLIC and EXTERNAL REFERENCES
 ;********************************************************************************************************
 
+			PUBLIC _OS_CPUcpsie
+			
             PUBLIC _OSTickISR
             PUBLIC _OSStartHighRdy
             PUBLIC _OSCtxSw
@@ -41,6 +43,12 @@
 .CODE
 .186
             PAGE                                  ; /*$PAGE*/
+            
+_OS_CPUcpsie	PROC FAR
+				MSR PRIMASK,R0			;
+				CPSIE	i
+				BX LR 
+_OS_CPUcpsie ENDP           
 ;*********************************************************************************************************
 ;                                          START MULTITASKING
 ;                                       void OSStartHighRdy(void)

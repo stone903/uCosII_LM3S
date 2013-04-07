@@ -3,16 +3,19 @@
 *                                               uC/OS-II
 *                                        The Real-Time Kernel
 *
-*                         (c) Copyright 1992-2002, Jean J. Labrosse, Weston, FL
-*                                          All Rights Reserved
 *
-*                                       80x86/80x88 Specific code
-*                                          LARGE MEMORY MODEL
+*   Reference Doc:  Doc0:Compiler SPNU151H
+*   				Doc1:Datasheet SPMS211L
+*   				Doc2:Instruction Set
+*   				Doc3:Driver code
+*
+*                                       LM3S5956 Specific code
+*
 *
 *                                          Borland C/C++ V4.51
 *
 * File         : OS_CPU.H
-* By           : Jean J. Labrosse
+* By           : Stone903
 *********************************************************************************************************
 */
 
@@ -26,21 +29,24 @@
 *********************************************************************************************************
 *                                              DATA TYPES
 *                                         (Compiler Specific)
+*                             we can get this info from the compiler document
+*                             section 6: run-time Environment P117
+*
 *********************************************************************************************************
 */
 
-typedef unsigned char  BOOLEAN;
-typedef unsigned char  INT8U;                    /* Unsigned  8 bit quantity                           */
-typedef signed   char  INT8S;                    /* Signed    8 bit quantity                           */
-typedef unsigned int   INT16U;                   /* Unsigned 16 bit quantity                           */
-typedef signed   int   INT16S;                   /* Signed   16 bit quantity                           */
-typedef unsigned long  INT32U;                   /* Unsigned 32 bit quantity                           */
-typedef signed   long  INT32S;                   /* Signed   32 bit quantity                           */
-typedef float          FP32;                     /* Single precision floating point                    */
-typedef double         FP64;                     /* Double precision floating point                    */
+typedef unsigned char    BOOLEAN;
+typedef unsigned char    INT8U;                    /* Unsigned  8 bit quantity                           */
+typedef signed   char    INT8S;                    /* Signed    8 bit quantity                           */
+typedef unsigned short   INT16U;                   /* Unsigned 16 bit quantity                           */
+typedef signed   short   INT16S;                   /* Signed   16 bit quantity                           */
+typedef unsigned int     INT32U;                   /* Unsigned 32 bit quantity                           */
+typedef signed   int  	 INT32S;                   /* Signed   32 bit quantity                           */
+typedef float          	 FP32;                     /* Single precision floating point                    */
+typedef double         	 FP64;                     /* Double precision floating point                    */
 
-typedef unsigned int   OS_STK;                   /* Each stack entry is 16-bit wide                    */
-typedef unsigned short OS_CPU_SR;                /* Define size of CPU status register (PSW = 16 bits) */
+typedef unsigned int   OS_STK;                   /* Each stack entry is 32-bit wide                    */
+typedef unsigned short OS_CPU_SR;                /* Define size of CPU status register (PSR = 32 bits) */
 
 #define BYTE           INT8S                     /* Define data types for backward compatibility ...   */
 #define UBYTE          INT8U                     /* ... to uC/OS V1.xx.  Not actually needed for ...   */
@@ -51,7 +57,7 @@ typedef unsigned short OS_CPU_SR;                /* Define size of CPU status re
 
 /* 
 *********************************************************************************************************
-*                              Intel 80x86 (Real-Mode, Large Model)
+*                              LM3S5956
 *
 * Method #1:  Disable/Enable interrupts using simple instructions.  After critical section, interrupts
 *             will be enabled even if they were disabled before entering the critical section.
@@ -69,32 +75,29 @@ typedef unsigned short OS_CPU_SR;                /* Define size of CPU status re
 */
 #define  OS_CRITICAL_METHOD    2
 
-#if      OS_CRITICAL_METHOD == 1
-#define  OS_ENTER_CRITICAL()  asm  CLI                    /* Disable interrupts                        */
-#define  OS_EXIT_CRITICAL()   asm  STI                    /* Enable  interrupts                        */
+#if      OS_CRITICAL_METHOD == 1								  /* Doc2:P210 								 */
+#define  OS_ENTER_CRITICAL()  __asm("CPSID i")                    /* Disable interrupts                        */
+#define  OS_EXIT_CRITICAL()   __asm("CPSIE i")                    /* Enable  interrupts                        */
 #endif
 
 #if      OS_CRITICAL_METHOD == 2
-#define  OS_ENTER_CRITICAL()  asm {PUSHF; CLI}            /* Disable interrupts                        */
-#define  OS_EXIT_CRITICAL()   asm  POPF                   /* Enable  interrupts                        */
+#define  OS_ENTER_CRITICAL()  __asm("MRS R0,PRIMASK\n PUSH RO\n CPSID i\n BX LR")           /* Disable interrupts                        */
+#define  OS_EXIT_CRITICAL()   __asm("POP R0\n MSR PRIMASK,R0\n CPSIE i\n BX LR")                    /* Enable  interrupts                        */
 #endif
 
 #if      OS_CRITICAL_METHOD == 3
-#define  OS_ENTER_CRITICAL()  (cpu_sr = OSCPUSaveSR())    /* Disable interrupts                        */
-#define  OS_EXIT_CRITICAL()   (OSCPURestoreSR(cpu_sr))    /* Enable  interrupts                        */
+#define  OS_ENTER_CRITICAL()  (cpu_sr = CPUcpsid())    /* Disable interrupts                        */
+#define  OS_EXIT_CRITICAL()   (OS_CPUcpsie(cpu_sr))    /* Enable  interrupts                        */
 #endif
 
 /*
 *********************************************************************************************************
-*                           Intel 80x86 (Real-Mode, Large Model) Miscellaneous
+*                           				LM3S5956 Miscellaneous
 *********************************************************************************************************
 */
 
 #define  OS_STK_GROWTH        1                       /* Stack grows from HIGH to LOW memory on 80x86  */
 
-#define  uCOS                 0x80                    /* Interrupt vector # used for context switch    */
-
-#define  OS_TASK_SW()         asm  INT   uCOS
 
 /*
 *********************************************************************************************************
@@ -110,9 +113,7 @@ OS_CPU_EXT  INT8U  OSTickDOSCtr;       /* Counter used to invoke DOS's tick hand
 *********************************************************************************************************
 */
 
-void       OSTaskStkInit_FPE_x86(OS_STK **pptos, OS_STK **ppbos, INT32U *psize);
-
 #if OS_CRITICAL_METHOD == 3                      /* Allocate storage for CPU status register           */
-OS_CPU_SR  OSCPUSaveSR(void);
 void       OSCPURestoreSR(OS_CPU_SR cpu_sr);
 #endif
+
