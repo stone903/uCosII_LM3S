@@ -48,7 +48,8 @@ _OS_CPUcpsie	PROC FAR
 				MSR PRIMASK,R0			;
 				CPSIE	i
 				BX LR 
-_OS_CPUcpsie ENDP           
+_OS_CPUcpsie ENDP  
+            PAGE                                  ; /*$PAGE*/         
 ;*********************************************************************************************************
 ;                                          START MULTITASKING
 ;                                       void OSStartHighRdy(void)
