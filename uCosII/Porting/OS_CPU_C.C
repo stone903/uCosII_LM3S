@@ -3,17 +3,19 @@
 *                                               uC/OS-II
 *                                         The Real-Time Kernel
 *
-*                         (c) Copyright 1992-2002, Jean J. Labrosse, Weston, FL
-*                                          All Rights Reserved
 *
 *
-*                                       80x86/80x88 Specific code
-*                                          LARGE MEMORY MODEL
+*                                       LM3S5956 Specific code
 *
-*                                          Borland C/C++ V4.51
+*                                          CCS
+*   Reference Doc:  Doc0:Compiler SPNU151H
+*   				Doc1:Datasheet SPMS211L
+*   				Doc2:Instruction Set
+*   				Doc3:Driver code
+*
 *
 * File         : OS_CPU_C.C
-* By           : Jean J. Labrosse
+* By           : Stone903
 *********************************************************************************************************
 */
 
@@ -166,107 +168,27 @@ OS_STK  *OSTaskStkInit (void (*task)(void *pd), void *pdata, OS_STK *ptos, INT16
 {
     INT16U *stk;
 
-
+    /* The Stack state when CPU handling Interrupt Doc1 P103*/
     opt    = opt;                           /* 'opt' is not used, prevent warning                      */
-    stk    = (INT16U *)ptos;                /* Load stack pointer                                      */
-    *stk-- = (INT16U)FP_SEG(pdata);         /* Simulate call to function with argument                 */
-    *stk-- = (INT16U)FP_OFF(pdata);         
-    *stk-- = (INT16U)FP_SEG(task);
-    *stk-- = (INT16U)FP_OFF(task);
-    *stk-- = (INT16U)0x0202;                /* SW = Interrupts enabled                                 */
-    *stk-- = (INT16U)FP_SEG(task);          /* Put pointer to task   on top of stack                   */
-    *stk-- = (INT16U)FP_OFF(task);
-    *stk-- = (INT16U)0xAAAA;                /* AX = 0xAAAA                                             */
-    *stk-- = (INT16U)0xCCCC;                /* CX = 0xCCCC                                             */
-    *stk-- = (INT16U)0xDDDD;                /* DX = 0xDDDD                                             */
-    *stk-- = (INT16U)0xBBBB;                /* BX = 0xBBBB                                             */
-    *stk-- = (INT16U)0x0000;                /* SP = 0x0000                                             */
-    *stk-- = (INT16U)0x1111;                /* BP = 0x1111                                             */
-    *stk-- = (INT16U)0x2222;                /* SI = 0x2222                                             */
-    *stk-- = (INT16U)0x3333;                /* DI = 0x3333                                             */
-    *stk-- = (INT16U)0x4444;                /* ES = 0x4444                                             */
-    *stk   = _DS;                           /* DS = Current value of DS                                */
+    stk    = (INT32U*)ptos;                /* Load stack pointer  Bottom of the stack                  */
+    *stk-- = (INT32U)0x01000000uL;         /* XPSR RESET VALUE  					                   */
+    *stk-- = (INT32U)task;         		   /* PC									                   */
+    *stk-- = (INT32U)task;				   /* LR									                   */
+    *stk-- = (INT32U)0;					   /* R12									                   */
+    *stk-- = (INT32U)0;                    /* R3									                   */
+    *stk-- = (INT32U)0;          		   /* R2									                   */
+    *stk-- = (INT32U)0;					   /* R1									                   */
+    *stk-- = (INT32U)pdata;                /* R0 USE R0-R3 TO PASS THE ARGUMENT Doc0 P128             */
+
+    *stk-- = (INT32U)0;                /* R11                                                     */
+    *stk-- = (INT32U)0;                /* R10                                                     */
+    *stk-- = (INT32U)0;                /* R9                                                      */
+    *stk-- = (INT32U)0;                /* R8                                                      */
+    *stk-- = (INT32U)0;                /* R7                                                      */
+    *stk-- = (INT32U)0;                /* R6                                                      */
+    *stk-- = (INT32U)0;                /* R5                                                      */
+    *stk = (INT32U)0;                  /* R4                                                      */
     return ((OS_STK *)stk);
-}
-
-/*$PAGE*/
-/*
-*********************************************************************************************************
-*                        INITIALIZE A TASK'S STACK FOR FLOATING POINT EMULATION
-*
-* Description: This function MUST be called BEFORE calling either OSTaskCreate() or OSTaskCreateExt() in
-*              order to initialize the task's stack to allow the task to use the Borland floating-point 
-*              emulation.  The returned pointer MUST be used in the task creation call.
-*
-*              Ex.:   OS_STK TaskStk[1000];
-*
-*
-*                     void main (void)
-*                     {
-*                         OS_STK *ptos;
-*                         OS_STK *pbos;
-*                         INT32U  size;
-*
-*
-*                         OSInit();
-*                         .
-*                         .
-*                         ptos  = &TaskStk[999];
-*                         pbos  = &TaskStk[0];
-*                         psize = 1000;
-*                         OSTaskStkInit_FPE_x86(&ptos, &pbos, &size);
-*                         OSTaskCreate(Task, (void *)0, ptos, 10);
-*                         .
-*                         .
-*                         OSStart();
-*                     }
-*
-* Arguments  : pptos         is the pointer to the task's top-of-stack pointer which would be passed to 
-*                            OSTaskCreate() or OSTaskCreateExt().
-*
-*              ppbos         is the pointer to the new bottom of stack pointer which would be passed to
-*                            OSTaskCreateExt().
-*
-*              psize         is a pointer to the size of the stack (in number of stack elements).  You 
-*                            MUST allocate sufficient stack space to leave at least 384 bytes for the 
-*                            floating-point emulation.
-*
-* Returns    : The new size of the stack once memory is allocated to the floating-point emulation.
-*
-* Note(s)    : 1) _SS  is a Borland 'pseudo-register' and returns the contents of the Stack Segment (SS)
-*              2) The pointer to the top-of-stack (pptos) will be modified so that it points to the new
-*                 top-of-stack.
-*              3) The pointer to the bottom-of-stack (ppbos) will be modified so that it points to the new
-*                 bottom-of-stack.
-*              4) The new size of the stack is adjusted to reflect the fact that memory was reserved on
-*                 the stack for the floating-point emulation.
-*********************************************************************************************************
-*/
-
-/*$PAGE*/
-void  OSTaskStkInit_FPE_x86 (OS_STK **pptos, OS_STK **ppbos, INT32U *psize)
-{
-    INT32U   lin_tos;                                 /* 'Linear' version of top-of-stack    address   */
-    INT32U   lin_bos;                                 /* 'Linear' version of bottom-of-stack address   */
-    INT16U   seg;
-    INT16U   off;
-    INT32U   bytes;
-
-
-    seg      = FP_SEG(*pptos);                        /* Decompose top-of-stack pointer into seg:off   */
-    off      = FP_OFF(*pptos);
-    lin_tos  = ((INT32U)seg << 4) + (INT32U)off;      /* Convert seg:off to linear address             */
-    bytes    = *psize * sizeof(OS_STK);               /* Determine how many bytes for the stack        */
-    lin_bos  = (lin_tos - bytes + 15) & 0xFFFFFFF0L;  /* Ensure paragraph alignment for BOS            */
-    
-    seg      = (INT16U)(lin_bos >> 4);                /* Get new 'normalized' segment                  */
-    *ppbos   = (OS_STK *)MK_FP(seg, 0x0000);          /* Create 'normalized' BOS pointer               */
-    memcpy(*ppbos, MK_FP(_SS, 0), 384);               /* Copy FP emulation memory to task's stack      */
-    bytes    = bytes - 16;                            /* Loose 16 bytes because of alignment           */
-    *pptos   = (OS_STK *)MK_FP(seg, (INT16U)bytes);   /* Determine new top-of-stack                    */
-    *ppbos   = (OS_STK *)MK_FP(seg, 384);             /* Determine new bottom-of-stack                 */
-    bytes    = bytes - 384;
-    *psize   = bytes / sizeof(OS_STK);                /* Determine new stack size                      */
 }
 
 /*$PAGE*/
