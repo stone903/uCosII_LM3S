@@ -2,77 +2,75 @@
 ;                                               uC/OS-II
 ;                                         The Real-Time Kernel
 ;
-;                          (c) Copyright 1992-2002, Jean J. Labrosse, Weston, FL
-;                                          All Rights Reserved
-;
-;
-;                                       80x86/80x88 Specific code
-;                                          LARGE MEMORY MODEL
-;
-;                                           Borland C/C++ V4.51
-;                                       (IBM/PC Compatible Target)
+*                                       LM3S5956 Specific code
+*
+*                                          CCS
+*   Reference Doc:  Doc0:Compiler SPNU151H
+*                   Doc1:Datasheet SPMS211L
+*                   Doc2:Instruction Set
+*                   Doc3:Driver code
 ;
 ; File         : OS_CPU_A.ASM
-; By           : Jean J. Labrosse
+; By           : Stone903
 ;********************************************************************************************************
 
 ;********************************************************************************************************
 ;                                    PUBLIC and EXTERNAL REFERENCES
 ;********************************************************************************************************
 
-			PUBLIC _OS_CPUcpsie
-			
-            PUBLIC _OSTickISR
-            PUBLIC _OSStartHighRdy
-            PUBLIC _OSCtxSw
-            PUBLIC _OSIntCtxSw
+    EXTERN  OSRunning                                           ; External references
+    EXTERN  OSPrioCur
+    EXTERN  OSPrioHighRdy
+    EXTERN  OSTCBCur
+    EXTERN  OSTCBHighRdy
+    EXTERN  OSIntExit
+    EXTERN  OSTaskSwHook
 
-            EXTRN  _OSIntExit:FAR
-            EXTRN  _OSTimeTick:FAR
-            EXTRN  _OSTaskSwHook:FAR
 
-            EXTRN  _OSIntNesting:BYTE
-            EXTRN  _OSTickDOSCtr:BYTE
-            EXTRN  _OSPrioHighRdy:BYTE
-            EXTRN  _OSPrioCur:BYTE
-            EXTRN  _OSRunning:BYTE
-            EXTRN  _OSTCBCur:DWORD
-            EXTRN  _OSTCBHighRdy:DWORD
+    PUBLIC  OS_CPU_SR_Save                                      ; Functions declared in this file
+    PUBLIC  OSStartHighRdy
+    PUBLIC  OSCtxSw
+    PUBLIC  OSIntCtxSw
+    PUBLIC  OS_CPU_PendSVHandler
 
-.MODEL      LARGE
-.CODE
-.186
-            PAGE                                  ; /*$PAGE*/
+;********************************************************************************************************
+;                                                EQUATES
+;********************************************************************************************************
+
+NVIC_INT_CTRL   EQU     0xE000ED04                              ; Interrupt control state register.
+NVIC_SYSPRI14   EQU     0xE000ED22                              ; System priority register (priority 14).
+NVIC_PENDSV_PRI EQU           0xFF                              ; PendSV priority value (lowest).
+NVIC_PENDSVSET  EQU     0x10000000    
+   
             
-_OS_CPUcpsie	PROC FAR
+OS_CPUcpsie	
 				MSR PRIMASK,R0			;
 				CPSIE	i
 				BX LR 
-_OS_CPUcpsie ENDP  
-            PAGE                                  ; /*$PAGE*/         
+      
 ;*********************************************************************************************************
 ;                                          START MULTITASKING
 ;                                       void OSStartHighRdy(void)
 ;
 ; The stack frame is assumed to look as follows:
 ;
-; OSTCBHighRdy->OSTCBStkPtr --> DS                               (Low memory)
-;                               ES
-;                               DI
-;                               SI
-;                               BP
-;                               SP
-;                               BX
-;                               DX
-;                               CX
-;                               AX
-;                               OFFSET  of task code address
-;                               SEGMENT of task code address
-;                               Flags to load in PSW
-;                               OFFSET  of task code address
-;                               SEGMENT of task code address
-;                               OFFSET  of 'pdata'
-;                               SEGMENT of 'pdata'               (High memory)
+; OSTCBHighRdy->OSTCBStkPtr --> R4                               (Low memory)
+;                               R5
+;                               R6
+;                               R7
+;                               R8
+;                               R9
+;                               R10
+;                               R11
+;                               R0
+;                               R1
+;                               R2
+;                               R3
+;                               R12
+;                               LR
+;                               PC
+;                               XPSR                             (High memory)
+;                                         
 ;
 ; Note : OSStartHighRdy() MUST:
 ;           a) Call OSTaskSwHook() then,
@@ -80,245 +78,129 @@ _OS_CPUcpsie ENDP
 ;           c) Switch to the highest priority task.
 ;*********************************************************************************************************
 
-_OSStartHighRdy  PROC FAR
+_OSStartHighRdy            
+            
+            LDR R0,NVIC_SYSPRI14               ;Set PendSV's priority to lowest
+            LDR R1,NVIC_PENDSV_PRI
+            STR R1,[R0]
+            
+            MOVS R0, #0                         ; Set the PSP to 0 for initial context switch call
+            MSR  PSP,R0
+            
+            MOV R0,#0X1
+            LDR R1,_OSRunning                   ;Load the address of _OSRunning
+            STR R0,[R1]                         ;Store R0 to the [R1]'S addresss Memory unit
+            
+            LDR R0,NVIC_INT_CTRL                ;Load the address of INTCTRL
+            LDR R1,NVIC_PENDSVSET               ;changes the PendSV exception state to pending                              
+            STR R1,[R0]                          ;Store configuration to INTCTRL
+                              ;Interrupt happen Goto PendSV handler
+            
+            CPSIE I                              ;Enable the interrupt.
+ OSStartHang
+    B       OSStartHang                                         ; Should never get here           
+            
+;********************************************************************************************************
+;                                         HANDLE PendSV EXCEPTION
+;                                     void OS_CPU_PendSVHandler(void)
+;
+; Note(s) : 1) PendSV is used to cause a context switch.  This is a recommended method for performing
+;              context switches with Cortex-M3.  This is because the Cortex-M3 auto-saves half of the
+;              processor context on any exception, and restores same on return from exception.  So only
+;              saving of R4-R11 is required and fixing up the stack pointers.  Using the PendSV exception
+;              this way means that context saving and restoring is identical whether it is initiated from
+;              a thread or occurs due to an interrupt or exception.
+;
+;           2) Pseudo-code is:
+;              a) Get the process SP, if 0 then skip (goto d) the saving part (first context switch);
+;              b) Save remaining regs r4-r11 on process stack;
+;              c) Save the process SP in its TCB, OSTCBCur->OSTCBStkPtr = SP;
+;              d) Call OSTaskSwHook();
+;              e) Get current high priority, OSPrioCur = OSPrioHighRdy;
+;              f) Get current ready thread TCB, OSTCBCur = OSTCBHighRdy;
+;              g) Get new process SP from TCB, SP = OSTCBHighRdy->OSTCBStkPtr;
+;              h) Restore R4-R11 from new process stack;
+;              i) Perform exception return which will restore remaining context.
+;
+;           3) On entry into PendSV handler:
+;              a) The following have been saved on the process stack (by processor):
+;                 xPSR, PC, LR, R12, R0-R3
+;              b) Processor mode is switched to Handler mode (from Thread mode)
+;              c) Stack is Main stack (switched from Process stack)
+;              d) OSTCBCur      points to the OS_TCB of the task to suspend
+;                 OSTCBHighRdy  points to the OS_TCB of the task to resume
+;
+;           4) Since PendSV is set to lowest priority in the system (by OSStartHighRdy() above), we
+;              know that it will only be run when no other exception or interrupt is active, and
+;              therefore safe to assume that context being switched out was using the process stack (PSP).
+;********************************************************************************************************
+            
+ OS_CPU_PendSVHandler
+    CPSID   I
+    MRS     R0,PSP
+    CBZ     R0,OS_CPU_PendSVHandler_nosave          ;skip for first time, it is ready when stack init
+    
+          ;Initial the stack, save the context
+    STMDB R0!,{R4-R11}                              ;Store R4-R11 to  stack contex                                              
+    LDR   R1,_OSTCBCur                              ;Load the address of _OSTCBCur
+    LDR   R1,[R1]                                   ;Load the value of _OSTCBCur(the address of SP)
+    STR   R0,[R1]                                   ;Store the new SP
+          ;Save the normal register into Stack Done
+          
+OS_CPU_PendSVHandler_nosave
+                ;Call Hook function
+    PUSH  {R14}                           ;Save LR exc_return value
+    B     _OSTaskSwHook                   ; Call user defined task switch hook
+    POP   {R14}
+                ;OSPrioCur = OSPrioHighRdy;
+    LDR   R0,OSPrioCur                    ;Load the address of OSPrioCur
+    LDR   R1,OSPrioHighRdy                ;Load the address of OSPrioHighRdy
+    LDR   R2,[R1]                         ;Load the value of OSPrioHighRdy
+    STR   R2,[R0]                         ;OSPrioCur = OSPrioHighRdy;
+                ;OSTCBCur  = OSTCBHighRdy;
+    LDR   R0,OSTCBCur                   
+    LDR   R1,OSTCBHighRdy
+    LDR   R2,[R1]
+    STR   R2,[R0]                        ;R2 is the address of new SP
+                ;recovery the context
+    LDR   R0,[R2]                        ;New value of New SP
+    LDMIA R0!,{R4-R11}                   ;Load new value to R4-R11
+    MSR   PSP,R0                         ;Save new SP    
+    ORR   LR, LR, #0x04                ; Ensure exception return uses process stack
+    CPSIE I
+    
+    BX    LR
 
-            MOV    AX, SEG _OSTCBHighRdy          ; Reload DS
-            MOV    DS, AX                         ;
-;
-            CALL   FAR PTR _OSTaskSwHook          ; Call user defined task switch hook
-;
-            MOV    AL, 1                          ; OSRunning = TRUE;
-            MOV    BYTE PTR DS:_OSRunning, AL     ;   (Indicates that multitasking has started)
-;
-            LES    BX, DWORD PTR DS:_OSTCBHighRdy ; SS:SP = OSTCBHighRdy->OSTCBStkPtr
-            MOV    SS, ES:[BX+2]                  ;
-            MOV    SP, ES:[BX+0]                  ;
-;
-            POP    DS                             ; Load task's context
-            POP    ES                             ;
-            POPA                                  ;
-;
-            IRET                                  ; Run task
-
-_OSStartHighRdy  ENDP
-
-            PAGE                                  ; /*$PAGE*/
-;*********************************************************************************************************
-;                                PERFORM A CONTEXT SWITCH (From task level)
+    
+    
+;********************************************************************************************************
+;                               PERFORM A CONTEXT SWITCH (From task level)
 ;                                           void OSCtxSw(void)
 ;
-; Note(s): 1) Upon entry,
-;             OSTCBCur     points to the OS_TCB of the task to suspend
-;             OSTCBHighRdy points to the OS_TCB of the task to resume
-;
-;          2) The stack frame of the task to suspend looks as follows:
-;
-;                 SP -> OFFSET  of task to suspend    (Low memory)
-;                       SEGMENT of task to suspend
-;                       PSW     of task to suspend    (High memory)
-;
-;          3) The stack frame of the task to resume looks as follows:
-;
-;                 OSTCBHighRdy->OSTCBStkPtr --> DS                               (Low memory)
-;                                               ES
-;                                               DI
-;                                               SI
-;                                               BP
-;                                               SP
-;                                               BX
-;                                               DX
-;                                               CX
-;                                               AX
-;                                               OFFSET  of task code address
-;                                               SEGMENT of task code address
-;                                               Flags to load in PSW             (High memory)
-;*********************************************************************************************************
+; Note(s) : 1) OSCtxSw() is called when OS wants to perform a task context switch.  This function
+;              triggers the PendSV exception which is where the real work is done.
+;********************************************************************************************************
 
-_OSCtxSw    PROC   FAR
-;
-            PUSHA                                  ; Save current task's context
-            PUSH   ES                              ;
-            PUSH   DS                              ;
-;
-            MOV    AX, SEG _OSTCBCur               ; Reload DS in case it was altered
-            MOV    DS, AX                          ;
-;
-            LES    BX, DWORD PTR DS:_OSTCBCur      ; OSTCBCur->OSTCBStkPtr = SS:SP
-            MOV    ES:[BX+2], SS                   ;
-            MOV    ES:[BX+0], SP                   ;
-;
-            CALL   FAR PTR _OSTaskSwHook           ; Call user defined task switch hook
-;
-            MOV    AX, WORD PTR DS:_OSTCBHighRdy+2 ; OSTCBCur = OSTCBHighRdy
-            MOV    DX, WORD PTR DS:_OSTCBHighRdy   ;
-            MOV    WORD PTR DS:_OSTCBCur+2, AX     ;
-            MOV    WORD PTR DS:_OSTCBCur, DX       ;
-;
-            MOV    AL, BYTE PTR DS:_OSPrioHighRdy  ; OSPrioCur = OSPrioHighRdy
-            MOV    BYTE PTR DS:_OSPrioCur, AL      ;
-;
-            LES    BX, DWORD PTR DS:_OSTCBHighRdy  ; SS:SP = OSTCBHighRdy->OSTCBStkPtr
-            MOV    SS, ES:[BX+2]                   ;
-            MOV    SP, ES:[BX]                     ;
-;
-            POP    DS                              ; Load new task's context
-            POP    ES                              ;
-            POPA                                   ;
-;
-            IRET                                   ; Return to new task
-;
-_OSCtxSw    ENDP
+OSCtxSw
+    LDR     R0, NVIC_INT_CTRL                                  ; Trigger the PendSV exception (causes context switch)
+    LDR     R1, NVIC_PENDSVSET
+    STR     R1, [R0]
+    BX      LR
 
-            PAGE                                   ; /*$PAGE*/
-;*********************************************************************************************************
-;                                PERFORM A CONTEXT SWITCH (From an ISR)
-;                                        void OSIntCtxSw(void)
+;********************************************************************************************************
+;                             PERFORM A CONTEXT SWITCH (From interrupt level)
+;                                         void OSIntCtxSw(void)
 ;
-; Note(s): 1) Upon entry,
-;             OSTCBCur     points to the OS_TCB of the task to suspend
-;             OSTCBHighRdy points to the OS_TCB of the task to resume
-;
-;          2) The stack frame of the task to suspend looks as follows:
-;
-;             OSTCBCur->OSTCBStkPtr ------>  DS                              (Low memory)
-;                                            ES
-;                                            DI
-;                                            SI
-;                                            BP
-;                                            SP
-;                                            BX
-;                                            DX
-;                                            CX
-;                                            AX
-;                                            OFFSET  of task code address
-;                                            SEGMENT of task code address
-;                                            Flags to load in PSW            (High memory)
-;
-;
-;          3) The stack frame of the task to resume looks as follows:
-;
-;             OSTCBHighRdy->OSTCBStkPtr --> DS                               (Low memory)
-;                                           ES
-;                                           DI
-;                                           SI
-;                                           BP
-;                                           SP
-;                                           BX
-;                                           DX
-;                                           CX
-;                                           AX
-;                                           OFFSET  of task code address
-;                                           SEGMENT of task code address
-;                                           Flags to load in PSW             (High memory)
-;*********************************************************************************************************
+; Notes:    1) OSIntCtxSw() is called by OSIntExit() when it determines a context switch is needed as
+;              the result of an interrupt.  This function simply triggers a PendSV exception which will
+;              be handled when there are no more interrupts active and interrupts are enabled.
+;********************************************************************************************************
 
-_OSIntCtxSw PROC   FAR
-;
-            CALL   FAR PTR _OSTaskSwHook           ; Call user defined task switch hook
-;
-            MOV    AX, SEG _OSTCBCur               ; Reload DS in case it was altered
-            MOV    DS, AX                          ;
-;
-            MOV    AX, WORD PTR DS:_OSTCBHighRdy+2 ; OSTCBCur = OSTCBHighRdy
-            MOV    DX, WORD PTR DS:_OSTCBHighRdy   ;
-            MOV    WORD PTR DS:_OSTCBCur+2, AX     ;
-            MOV    WORD PTR DS:_OSTCBCur, DX       ;
-;
-            MOV    AL, BYTE PTR DS:_OSPrioHighRdy  ; OSPrioCur = OSPrioHighRdy
-            MOV    BYTE PTR DS:_OSPrioCur, AL
-;
-            LES    BX, DWORD PTR DS:_OSTCBHighRdy  ; SS:SP = OSTCBHighRdy->OSTCBStkPtr
-            MOV    SS, ES:[BX+2]                   ;
-            MOV    SP, ES:[BX]                     ;
-;
-            POP    DS                              ; Load new task's context
-            POP    ES                              ;
-            POPA                                   ;
-;
-            IRET                                   ; Return to new task
-;
-_OSIntCtxSw ENDP
+OSIntCtxSw
+    LDR     R0, NVIC_INT_CTRL                                  ; Trigger the PendSV exception (causes context switch)
+    LDR     R1, NVIC_PENDSVSET
+    STR     R1, [R0]
+    BX      LR
 
-            PAGE                                   ; /*$PAGE*/
-;*********************************************************************************************************
-;                                            HANDLE TICK ISR
-;
-; Description: This function is called 199.99 times per second or, 11 times faster than the normal DOS
-;              tick rate of 18.20648 Hz.  Thus every 11th time, the normal DOS tick handler is called.
-;              This is called chaining.  10 times out of 11, however, the interrupt controller on the PC
-;              must be cleared to allow for the next interrupt.
-;
-; Arguments  : none
-;
-; Returns    : none
-;
-; Note(s)    : The following C-like pseudo-code describe the operation being performed in the code below.
-;
-;              Save all registers on the current task's stack;
-;              OSIntNesting++;
-;              if (OSIntNesting == 1) {
-;                 OSTCBCur->OSTCBStkPtr = SS:SP
-;              }
-;              OSTickDOSCtr--;
-;              if (OSTickDOSCtr == 0) {
-;                  OSTickDOSCtr = 11;
-;                  INT 81H;               Chain into DOS every 54.925 mS
-;                                         (Interrupt will be cleared by DOS)
-;              } else {
-;                  Send EOI to PIC;       Clear tick interrupt by sending an End-Of-Interrupt to the 8259
-;                                         PIC (Priority Interrupt Controller)
-;              }
-;              OSTimeTick();              Notify uC/OS-II that a tick has occured
-;              OSIntExit();               Notify uC/OS-II about end of ISR
-;              Restore all registers that were save on the current task's stack;
-;              Return from Interrupt;
-;*********************************************************************************************************
-;
-_OSTickISR  PROC   FAR
-;
-            PUSHA                                ; Save interrupted task's context
-            PUSH   ES
-            PUSH   DS
-;
-            MOV    AX, SEG(_OSIntNesting)        ; Reload DS
-            MOV    DS, AX
-            INC    BYTE PTR DS:_OSIntNesting     ; Notify uC/OS-II of ISR
-;
-            CMP    BYTE PTR DS:_OSIntNesting, 1	 ; if (OSIntNesting == 1)
-            JNE    SHORT _OSTickISR1             
-            MOV    AX, SEG(_OSTCBCur)            ;     Reload DS
-            MOV    DS, AX
-            LES    BX, DWORD PTR DS:_OSTCBCur    ;     OSTCBCur->OSTCBStkPtr = SS:SP
-            MOV    ES:[BX+2], SS                 ;
-            MOV    ES:[BX+0], SP                 ;
-;
-_OSTickISR1:
-            MOV    AX, SEG(_OSTickDOSCtr)        ; Reload DS
-            MOV    DS, AX
-            DEC    BYTE PTR DS:_OSTickDOSCtr
-            CMP    BYTE PTR DS:_OSTickDOSCtr, 0
-            JNE    SHORT _OSTickISR2             ; Every 11 ticks (~199.99 Hz), chain into DOS
-;
-            MOV    BYTE PTR DS:_OSTickDOSCtr, 11
-            INT    081H                          ; Chain into DOS's tick ISR
-            JMP    SHORT _OSTickISR3
-
-_OSTickISR2:
-            MOV    AL, 20H                       ; Move EOI code into AL.
-            MOV    DX, 20H                       ; Address of 8259 PIC in DX.
-            OUT    DX, AL                        ; Send EOI to PIC if not processing DOS timer.
-;
-_OSTickISR3:
-            CALL   FAR PTR _OSTimeTick           ; Process system tick
-;
-            CALL   FAR PTR _OSIntExit            ; Notify uC/OS-II of end of ISR
-;
-            POP    DS                            ; Restore interrupted task's context
-            POP    ES
-            POPA
-;
-            IRET                                 ; Return to interrupted task
-;
-_OSTickISR  ENDP
-;
-            END
+   
+   END
