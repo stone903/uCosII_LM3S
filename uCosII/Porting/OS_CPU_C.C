@@ -166,7 +166,7 @@ void  OSTaskStatHook (void)
 
 OS_STK  *OSTaskStkInit (void (*task)(void *pd), void *pdata, OS_STK *ptos, INT16U opt)
 {
-    INT16U *stk;
+	INT32U *stk;
 
     /* The Stack state when CPU handling Interrupt Doc1 P103*/
     opt    = opt;                           /* 'opt' is not used, prevent warning                      */

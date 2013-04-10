@@ -81,8 +81,8 @@ typedef unsigned short OS_CPU_SR;                /* Define size of CPU status re
 #endif
 
 #if      OS_CRITICAL_METHOD == 2
-#define  OS_ENTER_CRITICAL()  __asm("MRS R0,PRIMASK\n PUSH RO\n CPSID i\n BX LR")           /* Disable interrupts                        */
-#define  OS_EXIT_CRITICAL()   __asm("POP R0\n MSR PRIMASK,R0\n CPSIE i\n BX LR")                    /* Enable  interrupts                        */
+#define  OS_ENTER_CRITICAL()  __asm(" MRS R0,PRIMASK\n PUSH {R0}\n CPSID i\n BX LR")           /* Disable interrupts                        */
+#define  OS_EXIT_CRITICAL()   __asm(" POP {R0}\n MSR PRIMASK,R0\n CPSIE i\n BX LR")                    /* Enable  interrupts                        */
 #endif
 
 #if      OS_CRITICAL_METHOD == 3
@@ -98,7 +98,7 @@ typedef unsigned short OS_CPU_SR;                /* Define size of CPU status re
 
 #define  OS_STK_GROWTH        1                       /* Stack grows from HIGH to LOW memory on 80x86  */
 
-
+#define  OS_TASK_SW()         OSCtxSw()
 /*
 *********************************************************************************************************
 *                                            GLOBAL VARIABLES

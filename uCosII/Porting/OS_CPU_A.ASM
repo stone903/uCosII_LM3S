@@ -18,29 +18,29 @@
 ;                                    PUBLIC and EXTERNAL REFERENCES
 ;********************************************************************************************************
 
-    EXTERN  OSRunning                                           ; External references
-    EXTERN  OSPrioCur
-    EXTERN  OSPrioHighRdy
-    EXTERN  OSTCBCur
-    EXTERN  OSTCBHighRdy
-    EXTERN  OSIntExit
-    EXTERN  OSTaskSwHook
+    .global  OSRunning                                           ; External references
+    .global  OSPrioCur
+    .global  OSPrioHighRdy
+    .global  OSTCBCur
+    .global  OSTCBHighRdy
+    .global  OSIntExit
+    .global  OSTaskSwHook
 
 
-    PUBLIC  OS_CPU_SR_Save                                      ; Functions declared in this file
-    PUBLIC  OSStartHighRdy
-    PUBLIC  OSCtxSw
-    PUBLIC  OSIntCtxSw
-    PUBLIC  OS_CPU_PendSVHandler
+    .global  OS_CPU_SR_Save                                      ; Functions declared in this file
+    .global  OSStartHighRdy
+    .global  OSCtxSw
+    .global  OSIntCtxSw
+    .global  OS_CPU_PendSVHandler
 
 ;********************************************************************************************************
 ;                                                EQUATES
 ;********************************************************************************************************
 
-NVIC_INT_CTRL   EQU     0xE000ED04                              ; Interrupt control state register.
-NVIC_SYSPRI14   EQU     0xE000ED22                              ; System priority register (priority 14).
-NVIC_PENDSV_PRI EQU           0xFF                              ; PendSV priority value (lowest).
-NVIC_PENDSVSET  EQU     0x10000000    
+NVIC_INT_CTRL   .word     0xE000ED04                              ; Interrupt control state register.
+NVIC_SYSPRI14   .word     0xE000ED22                              ; System priority register (priority 14).
+NVIC_PENDSV_PRI .word           0xFF                              ; PendSV priority value (lowest).
+NVIC_PENDSVSET  .word     0x10000000    
    
             
 OS_CPUcpsie	
@@ -135,7 +135,7 @@ _OSStartHighRdy
 ;              therefore safe to assume that context being switched out was using the process stack (PSP).
 ;********************************************************************************************************
             
- OS_CPU_PendSVHandler
+OS_CPU_PendSVHandler
     CPSID   I
     MRS     R0,PSP
     CBZ     R0,OS_CPU_PendSVHandler_nosave          ;skip for first time, it is ready when stack init
@@ -203,4 +203,4 @@ OSIntCtxSw
     BX      LR
 
    
-   END
+   .end
