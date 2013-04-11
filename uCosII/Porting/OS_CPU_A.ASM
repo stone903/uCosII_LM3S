@@ -88,7 +88,7 @@ OS_CPUcpsie
 ;           c) Switch to the highest priority task.
 ;*********************************************************************************************************
 
-_OSStartHighRdy            
+OSStartHighRdy            
             
             LDR R0,NVIC_SYSPRI14               ;Set PendSV's priority to lowest
             LDR R1,NVIC_PENDSV_PRI
