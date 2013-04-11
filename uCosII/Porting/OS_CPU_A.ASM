@@ -32,6 +32,16 @@
     .global  OSCtxSw
     .global  OSIntCtxSw
     .global  OS_CPU_PendSVHandler
+    
+    .align  4
+ 
+
+||CPU_OSRunning||:     .field  OSRunning,32
+||CPU_OSPrioCur||:     .field  OSPrioCur,32
+||CPU_OSPrioHighRdy||: .field  OSPrioHighRdy,32
+||CPU_OSTCBCur||:     .field  OSTCBCur,32
+||CPU_OSTCBHighRdy||:  .field  OSTCBHighRdy,32
+
 
 ;********************************************************************************************************
 ;                                                EQUATES
@@ -88,7 +98,7 @@ _OSStartHighRdy
             MSR  PSP,R0
             
             MOV R0,#0X1
-            LDR R1,_OSRunning                   ;Load the address of _OSRunning
+            LDR R1,CPU_OSRunning                   ;Load the address of _OSRunning
             STR R0,[R1]                         ;Store R0 to the [R1]'S addresss Memory unit
             
             LDR R0,NVIC_INT_CTRL                ;Load the address of INTCTRL
@@ -97,7 +107,7 @@ _OSStartHighRdy
                               ;Interrupt happen Goto PendSV handler
             
             CPSIE I                              ;Enable the interrupt.
- OSStartHang
+OSStartHang
     B       OSStartHang                                         ; Should never get here           
             
 ;********************************************************************************************************
@@ -142,7 +152,7 @@ OS_CPU_PendSVHandler
     
           ;Initial the stack, save the context
     STMDB R0!,{R4-R11}                              ;Store R4-R11 to  stack contex                                              
-    LDR   R1,_OSTCBCur                              ;Load the address of _OSTCBCur
+    LDR   R1,CPU_OSTCBCur                              ;Load the address of _OSTCBCur
     LDR   R1,[R1]                                   ;Load the value of _OSTCBCur(the address of SP)
     STR   R0,[R1]                                   ;Store the new SP
           ;Save the normal register into Stack Done
@@ -150,16 +160,16 @@ OS_CPU_PendSVHandler
 OS_CPU_PendSVHandler_nosave
                 ;Call Hook function
     PUSH  {R14}                           ;Save LR exc_return value
-    B     _OSTaskSwHook                   ; Call user defined task switch hook
+    B     OSTaskSwHook                   ; Call user defined task switch hook
     POP   {R14}
                 ;OSPrioCur = OSPrioHighRdy;
-    LDR   R0,OSPrioCur                    ;Load the address of OSPrioCur
-    LDR   R1,OSPrioHighRdy                ;Load the address of OSPrioHighRdy
+    LDR   R0,CPU_OSPrioCur                    ;Load the address of OSPrioCur
+    LDR   R1,CPU_OSPrioHighRdy                ;Load the address of OSPrioHighRdy
     LDR   R2,[R1]                         ;Load the value of OSPrioHighRdy
     STR   R2,[R0]                         ;OSPrioCur = OSPrioHighRdy;
                 ;OSTCBCur  = OSTCBHighRdy;
-    LDR   R0,OSTCBCur                   
-    LDR   R1,OSTCBHighRdy
+    LDR   R0,CPU_OSTCBCur                   
+    LDR   R1,CPU_OSTCBHighRdy
     LDR   R2,[R1]
     STR   R2,[R0]                        ;R2 is the address of new SP
                 ;recovery the context

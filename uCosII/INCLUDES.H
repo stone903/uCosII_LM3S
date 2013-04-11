@@ -21,7 +21,7 @@
 #include    "..\LM3S\inc\hw_memmap.h"
 #include    "..\LM3S\inc\hw_ints.h"
 #include    "..\LM3S\inc\hw_nvic.h"
-//#include "LM3S\driverlib\interrupt.h"
+
 #include "..\LM3S\driverlib\interrupt.h"
 /* OS related files */
 #include    "..\uCosII\Porting\os_cpu.h"
