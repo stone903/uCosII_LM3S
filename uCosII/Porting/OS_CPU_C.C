@@ -22,6 +22,9 @@
 #define  OS_CPU_GLOBALS
 #include "includes.h"
 
+
+extern INT8U SysTickOut;
+
 /*
 *********************************************************************************************************
 *                                       OS INITIALIZATION HOOK
@@ -248,3 +251,23 @@ void  OSTimeTickHook (void)
 {
 }
 #endif
+
+
+void *OSTimeTickIsr(void)
+{
+#if OS_CRITICAL_METHOD == 3                                /* Allocate storage for CPU status register */
+		OS_CPU_SR  cpu_sr;
+#endif
+
+	OS_ENTER_CRITICAL();
+	OSIntNesting++;
+	OS_EXIT_CRITICAL();
+
+	SysTickOut++;
+	//GPIOPinWrite(GPIO_TEST_OUT_BASE,GPIO_SYS_TICK_OUTPUT,~SysTickOut);
+	GPIOPinWrite(GPIO_LED_PORT_BASE, GPIO_LED_PIN,SysTickOut);
+	OSTimeTick();                                /* Call uC/OS-II's OSTimeTick()                       */
+    OSIntExit(); 
+    return 0;
+}
+

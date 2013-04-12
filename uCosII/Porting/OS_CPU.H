@@ -73,11 +73,11 @@ typedef unsigned short OS_CPU_SR;                /* Define size of CPU status re
 *             into the CPU's status register.
 *********************************************************************************************************
 */
-#define  OS_CRITICAL_METHOD    2
+#define  OS_CRITICAL_METHOD    1
 
 #if      OS_CRITICAL_METHOD == 1								  /* Doc2:P210 								 */
-#define  OS_ENTER_CRITICAL()  __asm("CPSID i")                    /* Disable interrupts                        */
-#define  OS_EXIT_CRITICAL()   __asm("CPSIE i")                    /* Enable  interrupts                        */
+#define  OS_ENTER_CRITICAL()  __asm("	CPSID i")                    /* Disable interrupts                        */
+#define  OS_EXIT_CRITICAL()   __asm("	CPSIE i")                    /* Enable  interrupts                        */
 #endif
 
 #if      OS_CRITICAL_METHOD == 2
@@ -116,4 +116,7 @@ OS_CPU_EXT  INT8U  OSTickDOSCtr;       /* Counter used to invoke DOS's tick hand
 #if OS_CRITICAL_METHOD == 3                      /* Allocate storage for CPU status register           */
 void       OSCPURestoreSR(OS_CPU_SR cpu_sr);
 #endif
+
+void *OSTimeTickIsr(void);
+
 

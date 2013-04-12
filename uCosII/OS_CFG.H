@@ -22,7 +22,7 @@
                                        /* ---------------------- MISCELLANEOUS ----------------------- */
 #define OS_ARG_CHK_EN             1    /* Enable (1) or Disable (0) argument checking                  */
 
-#define OS_CPU_HOOKS_EN           0    /* uC/OS-II hooks are found in the processor port files         */
+#define OS_CPU_HOOKS_EN           1    /* uC/OS-II hooks are found in the processor port files         */
 
 #define OS_LOWEST_PRIO           63    /* Defines the lowest priority that can be assigned ...         */
                                        /* ... MUST NEVER be higher than 63!                            */

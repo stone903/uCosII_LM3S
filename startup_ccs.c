@@ -47,6 +47,10 @@ extern void _c_int00(void);
 //*****************************************************************************
 extern unsigned long __STACK_TOP;
 
+/* ISR Handler*/
+extern void OS_CPU_PendSVHandler(void);
+extern void *OSTimeTickIsr(void);
+
 //*****************************************************************************
 //
 // The vector table.  Note that the proper constructs must be placed on this to
@@ -73,7 +77,7 @@ void (* const g_pfnVectors[])(void) =
     IntDefaultHandler,                      // Debug monitor handler
     0,                                      // Reserved
     OS_CPU_PendSVHandler,                      // The PendSV handler
-    IntDefaultHandler,                      // The SysTick handler
+    OSTimeTickIsr,                      // The SysTick handler
     IntDefaultHandler,                      // GPIO Port A
     IntDefaultHandler,                      // GPIO Port B
     IntDefaultHandler,                      // GPIO Port C
@@ -171,9 +175,11 @@ FaultISR(void)
     //
     // Enter an infinite loop.
     //
+	/*
     while(1)
     {
     }
+    */
 }
 
 //*****************************************************************************

@@ -16,13 +16,19 @@
 #include    <stdlib.h>
 #include    <setjmp.h>
 
-/* Driver Files */
+/* Include Files */
 #include    "..\LM3S\inc\hw_types.h"
 #include    "..\LM3S\inc\hw_memmap.h"
 #include    "..\LM3S\inc\hw_ints.h"
 #include    "..\LM3S\inc\hw_nvic.h"
-
+/* Driver Files */
 #include "..\LM3S\driverlib\interrupt.h"
+#include "..\LM3S\driverlib\sysctl.h"
+#include "..\LM3S\driverlib\gpio.h"
+#include "..\LM3S\driverlib\Systick.h"
+
+/* Board Support Package Files */
+#include    "..\bsp\bsp.h"
 /* OS related files */
 #include    "..\uCosII\Porting\os_cpu.h"
 #include    "os_cfg.h"
