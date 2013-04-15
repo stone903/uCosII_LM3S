@@ -27,7 +27,7 @@
     .global  OSTaskSwHook
 
 
-    .global  OS_CPU_SR_Save                                      ; Functions declared in this file
+    .global  OS_CPUcpsie                                      ; Functions declared in this file
     .global  OSStartHighRdy
     .global  OSCtxSw
     .global  OSIntCtxSw

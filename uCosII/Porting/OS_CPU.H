@@ -73,7 +73,7 @@ typedef unsigned short OS_CPU_SR;                /* Define size of CPU status re
 *             into the CPU's status register.
 *********************************************************************************************************
 */
-#define  OS_CRITICAL_METHOD    1
+#define  OS_CRITICAL_METHOD    3
 
 #if      OS_CRITICAL_METHOD == 1								  /* Doc2:P210 								 */
 #define  OS_ENTER_CRITICAL()  __asm("	CPSID i")                    /* Disable interrupts                        */
