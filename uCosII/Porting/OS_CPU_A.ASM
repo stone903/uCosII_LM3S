@@ -39,8 +39,10 @@
 ||CPU_OSRunning||:     .field  OSRunning,32
 ||CPU_OSPrioCur||:     .field  OSPrioCur,32
 ||CPU_OSPrioHighRdy||: .field  OSPrioHighRdy,32
-||CPU_OSTCBCur||:     .field  OSTCBCur,32
+||CPU_OSTCBCur||:      .field  OSTCBCur,32
 ||CPU_OSTCBHighRdy||:  .field  OSTCBHighRdy,32
+
+
 
 
 ;********************************************************************************************************
@@ -48,10 +50,8 @@
 ;********************************************************************************************************
 
 NVIC_INT_CTRL   .word     0xE000ED04                              ; Interrupt control state register.
-NVIC_SYSPRI14   .word     0xE000ED22                              ; System priority register (priority 14).
-NVIC_PENDSV_PRI .word           0xFF                              ; PendSV priority value (lowest).
 NVIC_PENDSVSET  .word     0x10000000    
-   
+
             
 OS_CPUcpsie	
 				MSR PRIMASK,R0			;
@@ -88,18 +88,14 @@ OS_CPUcpsie
 ;           c) Switch to the highest priority task.
 ;*********************************************************************************************************
 
-OSStartHighRdy            
-            
-            LDR R0,NVIC_SYSPRI14               ;Set PendSV's priority to lowest
-            LDR R1,NVIC_PENDSV_PRI
-            STR R1,[R0]
-            
+OSStartHighRdy     
+
             MOVS R0, #0                         ; Set the PSP to 0 for initial context switch call
             MSR  PSP,R0
             
             MOV R0,#0X1
             LDR R1,CPU_OSRunning                   ;Load the address of _OSRunning
-            STR R0,[R1]                         ;Store R0 to the [R1]'S addresss Memory unit
+            STRB R0,[R1]                         ;Store R0 to the [R1]'S addresss Memory unit
             
             LDR R0,NVIC_INT_CTRL                ;Load the address of INTCTRL
             LDR R1,NVIC_PENDSVSET               ;changes the PendSV exception state to pending                              
@@ -159,14 +155,14 @@ OS_CPU_PendSVHandler
           
 OS_CPU_PendSVHandler_nosave
                 ;Call Hook function
-    PUSH  {R14}                           ;Save LR exc_return value
-    B     OSTaskSwHook                   ; Call user defined task switch hook
-    POP   {R14}
+    PUSH  {LR}                           ;Save LR exc_return value
+    BL     OSTaskSwHook                  ; Call user defined task switch hook
+    POP   {LR}
                 ;OSPrioCur = OSPrioHighRdy;
     LDR   R0,CPU_OSPrioCur                    ;Load the address of OSPrioCur
     LDR   R1,CPU_OSPrioHighRdy                ;Load the address of OSPrioHighRdy
-    LDR   R2,[R1]                         ;Load the value of OSPrioHighRdy
-    STR   R2,[R0]                         ;OSPrioCur = OSPrioHighRdy;
+    LDRB   R2,[R1]                         ;Load the value of OSPrioHighRdy
+    STRB   R2,[R0]                         ;OSPrioCur = OSPrioHighRdy;
                 ;OSTCBCur  = OSTCBHighRdy;
     LDR   R0,CPU_OSTCBCur                   
     LDR   R1,CPU_OSTCBHighRdy
