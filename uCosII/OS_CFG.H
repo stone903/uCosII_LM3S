@@ -97,7 +97,7 @@
 
                                        /* --------------------- TASK MANAGEMENT ---------------------- */
 #define OS_TASK_CHANGE_PRIO_EN    0    /*     Include code for OSTaskChangePrio()                      */
-#define OS_TASK_CREATE_EN         0    /*     Include code for OSTaskCreate()                          */
+#define OS_TASK_CREATE_EN         1    /*     Include code for OSTaskCreate()                          */
 #define OS_TASK_CREATE_EXT_EN     1    /*     Include code for OSTaskCreateExt()                       */
 #define OS_TASK_DEL_EN            0    /*     Include code for OSTaskDel()                             */
 #define OS_TASK_SUSPEND_EN        0    /*     Include code for OSTaskSuspend() and OSTaskResume()      */
