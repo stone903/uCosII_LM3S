@@ -23,7 +23,8 @@
 #include "includes.h"
 
 
-extern INT8U SysTickOut;
+extern INT32U SysTickOut;
+extern INT32U SysTickLedOut;
 
 /*
 *********************************************************************************************************
@@ -264,8 +265,9 @@ void *OSTimeTickIsr(void)
 	OS_EXIT_CRITICAL();
 
 	SysTickOut++;
-	//GPIOPinWrite(GPIO_TEST_OUT_BASE,GPIO_SYS_TICK_OUTPUT,~SysTickOut);
-	GPIOPinWrite(GPIO_LED_PORT_BASE, GPIO_LED_PIN,SysTickOut);
+	SysTickLedOut = ~SysTickLedOut;
+	GPIOPinWrite(GPIO_TEST_OUT_BASE,GPIO_SYS_TICK_OUTPUT,SysTickOut);
+	GPIOPinWrite(GPIO_LED_PORT_BASE,GPIO_LED_PIN1,SysTickLedOut);
 	OSTimeTick();                                /* Call uC/OS-II's OSTimeTick()                       */
     OSIntExit(); 
     return 0;
