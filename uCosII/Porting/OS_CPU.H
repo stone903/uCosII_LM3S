@@ -80,11 +80,6 @@ typedef unsigned short OS_CPU_SR;                /* Define size of CPU status re
 #define  OS_EXIT_CRITICAL()   __asm("	CPSIE i")                    /* Enable  interrupts                        */
 #endif
 
-#if      OS_CRITICAL_METHOD == 2
-#define  OS_ENTER_CRITICAL()  __asm(" MRS R0,PRIMASK\n PUSH {R0}\n CPSID i\n BX LR")           /* Disable interrupts                        */
-#define  OS_EXIT_CRITICAL()   __asm(" POP {R0}\n MSR PRIMASK,R0\n CPSIE i\n BX LR")                    /* Enable  interrupts                        */
-#endif
-
 #if      OS_CRITICAL_METHOD == 3
 #define  OS_ENTER_CRITICAL()  (cpu_sr = CPUcpsid())    /* Disable interrupts                        */
 #define  OS_EXIT_CRITICAL()   (OS_CPUcpsie(cpu_sr))    /* Enable  interrupts                        */
